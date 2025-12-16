@@ -29,7 +29,25 @@
 
 ### 3.1 协议栈子系统 (`datalink/`)
 
-该部分实现了从用户数据到物理层比特流的完整转换。
+`datalink` 子系统模拟了从用户载荷数据到物理层符号流的转换，采用了流式处理架构。
+
+```mermaid
+graph TD
+    User[用户载荷 Payload] -->|帧生成| DLL[数据链路层 DLL]
+    DLL -->|PLTU 封装| CS[编码与同步子层 C&S]
+    CS -->|LDPC 1/2 编码| PHY_TX[发射机输出]
+    PHY_TX -->|加噪信道| PHY_RX[接收机输入]
+    
+    subgraph 接收端逻辑
+    PHY_RX -->|CSM 搜索| FSM[流式状态机 FSM]
+    FSM -->|累积与译码| LDPC_DEC[LDPC 译码器]
+    LDPC_DEC -->|比特流| ASM_SEARCH[ASM 搜索]
+    ASM_SEARCH -->|滑动 CRC| FRAME_EXT[变长帧提取]
+    end
+    
+    FRAME_EXT -->|FARM-P 逻辑| ARQ{ARQ 校验}
+    ARQ -->|Ack/Nack| FEEDBACK[PLCW 生成]
+```
 
 * **COP-P 通信操作过程**:
   * **FOP-P (发送端)**: 维护 $V(S)$ 状态，支持 **Go-Back-N** 自动重传策略，管理发送队列。
@@ -46,6 +64,15 @@
 
 该部分模拟了基于伪码调制的激光测距与通信链路。
 
+```mermaid
+graph LR
+    Data[原始数据] -->|DSSS 扩频| Mod[相位调制]
+    Mod -->|自由空间信道| PD[光电检测器]
+    PD -->|混频| PLL[PLL 科斯塔斯环]
+    PLL -->|相位误差| DLL[DLL 早晚门相关器]
+    DLL -->|延迟索引| Result[测距与误码率]
+```
+
 * **信号链路**: 伪码扩频 (DSSS) $\to$ 激光相位调制 $\to$ 光电混合 (PD) $\to$ 信号解调。
 * **核心算法**:
   * **PLL (锁相环)**: 实现 Costas 环/科斯塔斯环逻辑，完成载波同步与相位提取。
@@ -57,7 +84,7 @@
 ## 4. 目录结构 (Directory Structure)
 
 ```textile
-Proximity-Project/
+Protocol-for-TQ/
 ├── datalink/                   # [子系统1] 协议栈仿真
 │   ├── archive/                # 历史测试脚本
 │   ├── data/                   # LDPC H矩阵(.mat)
@@ -81,7 +108,7 @@ Proximity-Project/
 
 ---
 
-## 5. 快速开始 (Getting Started)
+## 5. 快速开始 (Quick Start)
 
 ### 5.1 环境要求
 
@@ -185,5 +212,3 @@ generate_LDPC_matrix
 ---
 
 > **Note**: 本项目为仿真原型，代码中禁用了部分安全检查以方便调试。在实际部署或参考时，请注意处理敏感信息保护。
-
-
