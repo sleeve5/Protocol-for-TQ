@@ -1,3 +1,5 @@
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script> 
+
 # Proximity-1 空间链路协议仿真系统说明文档
 
 **—— 数据链路层 (Data Link Layer)**
