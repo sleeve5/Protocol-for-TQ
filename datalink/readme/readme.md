@@ -1,33 +1,46 @@
 # Proximity-1 空间链路协议仿真系统说明文档
 
-**—— 编码与同步子层 (Coding & Synchronization Sublayer)**
+**—— 数据链路层 (Data Link Layer)**
 
 ## 1. 系统概述 (System Overview)
 
-本项目基于 MATLAB 平台，设计并实现了一个符合 **GB/T 39353-2020**（修改采用 ISO 21459:2015 / CCSDS 211.2-B-3）标准的 Proximity-1 协议物理层仿真系统。
+本项目基于 MATLAB 平台，设计并实现了一个符合 **GB/T 39353-2020**（修改采用 ISO 21459:2015 / CCSDS 211.2-B-3）标准的 Proximity-1 协议数据链路层仿真系统。
 
-系统核心聚焦于 **编码与同步子层 (C&S Sublayer)**，实现了从数据链路层传送帧到物理层符号流的双向闭环传输。系统能够在加性高斯白噪声（AWGN）信道下，利用 **LDPC 码** 的高增益特性实现可靠通信，并通过 **双重同步机制（CSM/ASM）** 解决深空通信中的同步难题。
+系统构建了一个完整的深空通信协议栈闭环，涵盖了从**数据链路层 (Data Link Layer)** 的帧生成与 ARQ 重传，到 **编码与同步子层 (C&S Sublayer)** 的信道编码，再到 **物理层 (Physical Layer)** 的调制与传输。
+
+核心特性包括：
+
+1. **高增益信道编码**：实现 CCSDS C2 码族 LDPC (Rate 1/2)，在低信噪比下提供强力纠错。
+2. **双重同步机制**：物理层 CSM 同步与链路层 ASM 同步相结合，解决深空盲同步难题。
+3. **可靠传输协议**：实现了 COP-P (Communication Operations Procedure) 中的 FOP-P 和 FARM-P 状态机，支持 Go-Back-N 自动重传 (ARQ)。
+4. **流式处理架构**：接收端采用双缓冲分层状态机，能够处理碎片化、非对齐的实时比特流。
 
 ---
 
 ## 2. 工程目录结构
 
 ```text
-Proximity_Project/
+Data-Link-Layer/
 ├── data/                       # 数据缓存目录
 │   └── CCSDS_C2_matrix.mat     # 预生成的 LDPC H 矩阵
 ├── libs/                       # 核心算法库
-│   ├── scs_transmitter.m       # [核心] 发送主控函数
-│   ├── receiver.m              # [核心] 接收主控函数 (批处理模式)
-│   ├── Proximity1Receiver.m    # [核心] 接收机类 (流式状态机模式)
-│   ├── ldpc_encoding_chain.m   # LDPC 编码链路 (编码+打孔+随机化+CSM)
-│   ├── ldpc_decoder.m          # LDPC 译码链路 (含逆打孔与去随机化)
-│   ├── frame_synchronizer.m    # 通用同步器 (用于搜索 CSM 和 ASM)
-│   ├── CRC32.m                 # CRC 生成器
-│   ├── CRC32_check.m           # CRC 校验器
-│   ├── build_PLTU.m            # PLTU 组装
-│   ├── generate_idle_sequence.m # 空闲序列生成
-│   └── hex2bit_MSB.m           # 16进制转 MSB 2进制工具
+│   ├── scs_transmitter.m       # [C&S] 发送主控函数 (PLTU封装 + LDPC编码)
+│   ├── receiver.m              # [C&S] 接收主控函数 (批处理模式)
+│   ├── Proximity1Receiver.m    # [C&S] 接收机类 (流式状态机模式)
+│   ├── ldpc_encoding_chain.m   # [C&S] LDPC 编码链路
+│   ├── ldpc_decoder.m          # [C&S] LDPC 译码链路
+│   ├── frame_synchronizer.m    # [C&S] 通用同步器 (CSM/ASM)
+│   ├── build_PLTU.m            # [C&S] PLTU 组装
+│   ├── frame_generator.m       # [DLL] 传送帧生成器 (Header + Payload)
+│   ├── frame_parser.m          # [DLL] 传送帧解析器
+│   ├── FOP_Process.m           # [DLL] 发送端 FOP-P 状态机 (ARQ 控制)
+│   ├── FARM_Process.m          # [DLL] 接收端 FARM-P 状态机 (ARQ 控制)
+│   ├── build_PLCW.m            # [DLL] 控制字 PLCW 生成
+│   ├── parse_PLCW.m            # [DLL] 控制字 PLCW 解析
+│   ├── CRC32.m                 # 工具: CRC 生成
+│   ├── CRC32_check.m           # 工具: CRC 校验
+│   ├── generate_idle_sequence.m # 工具: 空闲序列
+│   └── hex2bit_MSB.m           # 工具: 进制转换
 ├── utils/                      # 工具脚本
 │   └── generate_ccsds_c2_matrix.m # CCSDS C2 H 矩阵生成算法实现
 ├── readme/
@@ -38,9 +51,10 @@ Proximity_Project/
 │   ├── framing.md              # 帧结构设计
 │   ├── COP_P.md                # 通信操作过程
 │   └── readme.md               # 本项目介绍
-├── test_CS_Layer.m             # [入口] C&S功能闭环测试脚本
-├── test_streaming_fsm.m        # [入口] C&S流式仿真测试脚本
-├── test_robustness.m           # [入口] 接收机鲁棒性测试脚本
+├── test_main.m                 # [入口] 全协议栈流式闭环仿真
+├── test_unit_fsm.m             # [入口] 基于状态机的流式接收测试
+├── test_unit_farm.m            # [入口] 接收端逻辑单元测试
+└── test_session.m              # [入口] 会话建立测试脚本
 ```
 
 ---
@@ -197,11 +211,13 @@ $$
 
 ### 7.2 仿真脚本说明
 
-| 脚本文件名                  | 类型                 | 功能描述                                                                                                                                                          | 预期结果                                                                       |
-|:---------------------- |:------------------ |:------------------------------------------------------------------------------------------------------------------------------------------------------------- |:-------------------------------------------------------------------------- |
-| **`test_main.m`**<br>  | **[主入口]**<br>全系统仿真 | **这是本项目的核心演示脚本。**<br>模拟 Alice 与 Bob 之间的双向通信。包含：<br>1. 变长帧生成与封装<br>2. LDPC 编码与调制<br>3. **信道突发干扰模拟 (SNR 骤降)**<br>4. 接收端流式解调与同步<br>5. **ARQ 自动重传演示 (Go-Back-N)** | 能够看到系统在信道丢包后，自动触发 NACK 并重传丢失帧，最终实现所有数据无误、有序接收。                             |
-| **`test_unit_fsm.m`**  | 鲁棒性测试              | 专门测试 **`Proximity1Receiver`** 类的流式处理能力。模拟数据以极小碎片（1-256 bits）随机到达的情况。                                                                                          | 验证接收机内部状态机能否在数据碎片化的情况下正确拼接并还原数据帧。                                          |
-| **`test_unit_farm.m`** | 逻辑验证               | 专门测试数据链路层的 **FARM-P (接收控制)** 逻辑。不涉及物理层，直接输入帧头信息。                                                                                                              | 验证接收端能否正确识别：<br>- 正常帧 (Accept)<br>- 乱序帧 (Reject + Retx)<br>- 重复帧 (Discard) |
+| 脚本文件名                                                                           | 类型                   | 功能描述                                                                                                                                                          | 预期结果                                                                       |
+|:------------------------------------------------------------------------------- |:-------------------- |:------------------------------------------------------------------------------------------------------------------------------------------------------------- |:-------------------------------------------------------------------------- |
+| **`test_session.m`**<br>                                                        | **[主入口]**<br>会话建立仿真  | **Proximity-1 会话建立仿真 (Hailing) - 17万公里长延迟场景** <br/>Alice (Sat-1) 主动呼叫 Bob (Sat-2)                                                                             |                                                                            |
+| <br/>流程: Inactive -> Alice发送Hail指令 -> 长延迟 -> Bob接收并应答 -> 长延迟 -> Alice收到 -> 链路建立 | 可以成功建立由Alice到Bob的会话。 |                                                                                                                                                               |                                                                            |
+| **`test_main.m`**<br>                                                           | **[主入口]**<br>全系统仿真   | **这是本项目的核心演示脚本。**<br>模拟 Alice 与 Bob 之间的双向通信。包含：<br>1. 变长帧生成与封装<br>2. LDPC 编码与调制<br>3. **信道突发干扰模拟 (SNR 骤降)**<br>4. 接收端流式解调与同步<br>5. **ARQ 自动重传演示 (Go-Back-N)** | 能够看到系统在信道丢包后，自动触发 NACK 并重传丢失帧，最终实现所有数据无误、有序接收。                             |
+| **`test_unit_fsm.m`**                                                           | 鲁棒性测试                | 专门测试 **`Proximity1Receiver`** 类的流式处理能力。模拟数据以极小碎片（1-256 bits）随机到达的情况。                                                                                          | 验证接收机内部状态机能否在数据碎片化的情况下正确拼接并还原数据帧。                                          |
+| **`test_unit_farm.m`**                                                          | 逻辑验证                 | 专门测试数据链路层的 **FARM-P (接收控制)** 逻辑。不涉及物理层，直接输入帧头信息。                                                                                                              | 验证接收端能否正确识别：<br>- 正常帧 (Accept)<br>- 乱序帧 (Reject + Retx)<br>- 重复帧 (Discard) |
 
 ### 7.3 运行步骤示例
 

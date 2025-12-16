@@ -1,75 +1,92 @@
 classdef MAC_Controller < handle
-    % MAC_Controller: 介质访问控制子层
-    % 场景适配：处理长延迟链路的建立 (Hailing)
+    % MAC_Controller: 介质访问控制子层 (修正版)
+    % 适配: 3参数构造函数 (IsCaller, IO, FOP)
     
     properties
-        State           % 'INACTIVE', 'HAILING', 'DATA_SERVICES'
-        Local_SCID
-        Current_Remote_SCID % 当前正在通信的目标
+        State           % 当前状态
+        IsCaller        % true=主叫(Caller), false=被叫(Responder)
         
-        % MIB 参数 (基于 17万km 场景调整)
-        % RTT ≈ 1.14s，为了稳健，超时建议设为 3-5秒
-        Hail_Wait_Duration = 5;  % 秒
-        Comm_Change_Wait   = 5;  % 秒
-        
-        % 子层引用
+        % 关联子层
         IO_Layer
+        FOP_Layer
+        
+        % 会话参数
+        Current_Remote_SCID 
+        Hail_Wait_Duration = 5.0; % 默认超时时间 (秒)
     end
     
     methods
-        function obj = MAC_Controller(local_scid, io_layer)
-            obj.Local_SCID = local_scid;
+        % =================================================================
+        % 构造函数 (修正点: 接受 3 个参数)
+        % =================================================================
+        function obj = MAC_Controller(is_caller, io_layer, fop_layer)
+            obj.IsCaller = is_caller;
             obj.IO_Layer = io_layer;
+            obj.FOP_Layer = fop_layer;
             obj.State = 'INACTIVE';
         end
         
-        % [Tx] 发起呼叫 (Hailing) - 建立会话
+        % =================================================================
+        % [Tx] 发起呼叫 (Hailing)
+        % =================================================================
         function start_hailing(obj, remote_scid)
+            if ~obj.IsCaller
+                warning('MAC: 只有 Caller 才能发起呼叫。');
+                return;
+            end
+            
             obj.Current_Remote_SCID = remote_scid;
             obj.State = 'HAILING';
             
-            fprintf('[MAC] 正在呼叫卫星 Sat-%d (预计 RTT > 1.2s)...\n', remote_scid);
+            fprintf('[MAC] 进入 HAILING 状态，正在呼叫 Sat-%d...\n', remote_scid);
             
-            % 1. 构造 SET TRANSMITTER PARAMETERS 指令 (Annex B1.2)
-            % 这里简化为比特流生成
-            dir_tx = build_directive_set_tx_params();
+            % 1. 构造指令 (SET TRANSMITTER/RECEIVER PARAMETERS)
+            % 这里调用辅助函数生成指令比特
+            dir_tx = obj.build_dummy_directive(); 
+            dir_rx = obj.build_dummy_directive();
             
-            % 2. 构造 SET RECEIVER PARAMETERS 指令 (Annex B1.4)
-            dir_rx = build_directive_set_rx_params();
-            
-            % 3. 打包进 SPDU (Type 1)
+            % 2. 打包进 SPDU (Type 1)
+            % 需要确保 build_SPDU 在路径中
             spdu_bits = build_SPDU({dir_tx, dir_rx});
             
-            % 4. 发送 (必须是 Expedited 队列)
-            % 呼叫帧通常是 P-Frame
+            % 3. 发送 (通过 IO 层)
             obj.IO_Layer.send_directive(spdu_bits, remote_scid);
-            
-            fprintf('[MAC] Hailing P-Frame 已放入发送队列。\n');
-            % 此处应启动定时器等待 Hail_Wait_Duration
         end
         
-        % [Rx] 处理接收到的指令
+        % =================================================================
+        % [Rx] 处理接收到的 SPDU (来自 IO 层的通知)
+        % =================================================================
         function process_received_spdu(obj, src_scid, spdu_payload)
-            % 解析 SPDU
-            % 这里简化逻辑：如果是 Hailing 请求，则回送应答
+            % 简单状态机逻辑
             
-            fprintf('[MAC] 解析来自 Sat-%d 的 SPDU...\n', src_scid);
-            
-            if strcmp(obj.State, 'INACTIVE')
-                % 收到呼叫，转入 Active
-                fprintf('[MAC] 收到 Hailing 请求，接受会话。\n');
-                obj.State = 'DATA_SERVICES';
-                obj.Current_Remote_SCID = src_scid;
-                
-                % 发送应答 (Report 或 数据)
-                % 标准中通常回送 Status Report 或 PLCW 确认
-                % 这里简单回送一个 "Connection OK" 的指令
-                % obj.IO_Layer.send_directive(..., src_scid);
-            elseif strcmp(obj.State, 'HAILING') && src_scid == obj.Current_Remote_SCID
-                % 收到呼叫应答
-                fprintf('[MAC] 收到 Hailing 应答，链路建立成功！\n');
-                obj.State = 'DATA_SERVICES';
+            switch obj.State
+                case 'INACTIVE'
+                    % 如果是 Responder，收到数据意味着 Caller 在呼叫
+                    if ~obj.IsCaller
+                        fprintf('[MAC] 收到来自 Sat-%d 的连接请求。\n', src_scid);
+                        fprintf('[MAC] 状态迁移: INACTIVE -> DATA_SERVICES\n');
+                        obj.State = 'DATA_SERVICES';
+                        obj.Current_Remote_SCID = src_scid;
+                        
+                        % 实际协议中这里应该回送应答 (Reply)
+                    end
+                    
+                case 'HAILING'
+                    % 如果是 Caller，收到数据意味着 Responder 应答了
+                    if obj.IsCaller && src_scid == obj.Current_Remote_SCID
+                        fprintf('[MAC] 收到 Sat-%d 的 Hailing 应答。\n', src_scid);
+                        fprintf('[MAC] 状态迁移: HAILING -> DATA_SERVICES\n');
+                        obj.State = 'DATA_SERVICES';
+                    end
+                    
+                case 'DATA_SERVICES'
+                    fprintf('[MAC] 会话中收到 SPDU，执行指令...\n');
             end
+        end
+        
+        % 内部辅助: 生成一个占位指令 (全1) 用于测试
+        function bits = build_dummy_directive(obj)
+            bits = true(1, 16); % 16 bits dummy
         end
     end
 end

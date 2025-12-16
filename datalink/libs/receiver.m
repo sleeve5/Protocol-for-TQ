@@ -4,11 +4,12 @@
 % 输入：
 %   rx_soft_bits - 接收到的软信息流 (LLR)
 %   sim_params   - 仿真参数 (CodingType等)
+%   io_layer_obj - 
 % 输出：
 %   recovered_frames - 成功通过 CRC 校验的帧集合
 % --------------------------
 
-function recovered_frames = receiver(rx_soft_bits, sim_params)
+function recovered_frames = receiver(rx_soft_bits, sim_params, io_layer_obj)
     recovered_frames = {};
     
     % --- 1. 标准参数 ---
@@ -116,13 +117,27 @@ function recovered_frames = receiver(rx_soft_bits, sim_params)
             % 调用 CRC 校验
             [isValid, clean_frame] = CRC32_check(current_try);
             
+            % if isValid
+            %     % D. 校验通过！
+            %     % fprintf('    [RX] 发现有效帧 @ ASM#%d, 长度 %d bits\n', i, length(clean_frame));
+            %     recovered_frames{end+1} = clean_frame;
+            %     found_frame = true;
+            %     break; % 找到一个就可以停止了 (假设ASM之间只有一个帧)
+            % end
             if isValid
-                % D. 校验通过！
-                % fprintf('    [RX] 发现有效帧 @ ASM#%d, 长度 %d bits\n', i, length(clean_frame));
                 recovered_frames{end+1} = clean_frame;
-                found_frame = true;
-                break; % 找到一个就可以停止了 (假设ASM之间只有一个帧)
+                
+                % [新增集成] 如果传入了 IO 对象，则进行上层分发
+                if nargin >= 3 && ~isempty(io_layer_obj)
+                    % 解析帧头
+                    [header, payload] = frame_parser(clean_frame);
+                    % 上交数据
+                    io_layer_obj.receive_frame_data(header, payload);
+                end
+                
+                break; 
             end
+            
         end
         
         if ~found_frame
