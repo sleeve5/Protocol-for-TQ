@@ -6,7 +6,7 @@
 
 本项目基于 MATLAB 平台，设计并实现了一个符合 **GB/T 39353-2020**（修改采用 ISO 21459:2015 / CCSDS 211.2-B-3）标准的 Proximity-1 协议数据链路层仿真系统。
 
-系统构建了一个完整的深空通信协议栈闭环，涵盖了从**数据链路层 (Data Link Layer)** 的帧生成与 ARQ 重传，到 **编码与同步子层 (C&S Sublayer)** 的信道编码，再到 **物理层 (Physical Layer)** 的调制与传输。
+系统构建了一个完整的深空通信协议栈闭环，涵盖了从**数据链路层 (Data Link Layer)** 的帧生成与 ARQ 重传，到 **编码与同步子层 (CSS)** 的信道编码，再到 **物理层 (Physical Layer)** 的调制与传输。
 
 核心特性包括：
 
@@ -24,13 +24,13 @@ Data-Link-Layer/
 ├── data/                       # 数据缓存目录
 │   └── CCSDS_C2_matrix.mat     # 预生成的 LDPC H 矩阵
 ├── libs/                       # 核心算法库
-│   ├── scs_transmitter.m       # [C&S] 发送主控函数 (PLTU封装 + LDPC编码)
-│   ├── receiver.m              # [C&S] 接收主控函数 (批处理模式)
-│   ├── Proximity1Receiver.m    # [C&S] 接收机类 (流式状态机模式)
-│   ├── ldpc_encoding_chain.m   # [C&S] LDPC 编码链路
-│   ├── ldpc_decoder.m          # [C&S] LDPC 译码链路
-│   ├── frame_synchronizer.m    # [C&S] 通用同步器 (CSM/ASM)
-│   ├── build_PLTU.m            # [C&S] PLTU 组装
+│   ├── scs_transmitter.m       # [CSS] 发送主控函数 (PLTU封装 + LDPC编码)
+│   ├── receiver.m              # [CSS] 接收主控函数 (批处理模式)
+│   ├── Proximity1Receiver.m    # [CSS] 接收机类 (流式状态机模式)
+│   ├── ldpc_encoding_chain.m   # [CSS] LDPC 编码链路
+│   ├── ldpc_decoder.m          # [CSS] LDPC 译码链路
+│   ├── frame_synchronizer.m    # [CSS] 通用同步器 (CSM/ASM)
+│   ├── build_PLTU.m            # [CSS] PLTU 组装
 │   ├── frame_generator.m       # [DLL] 传送帧生成器 (Header + Payload)
 │   ├── frame_parser.m          # [DLL] 传送帧解析器
 │   ├── FOP_Process.m           # [DLL] 发送端 FOP-P 状态机 (ARQ 控制)
@@ -77,7 +77,7 @@ Data-Link-Layer/
 
 ## 4. 数据流与帧封装原理 (Data Flow & Encapsulation)
 
-在 C&S 子层中，数据经历了三次形态转换，形成了严格的层级封装结构。
+在 CSS 子层中，数据经历了三次形态转换，形成了严格的层级封装结构。
 
 ### 4.1 封装流程图解
 
@@ -281,7 +281,7 @@ $$
 
 ### 9.2 标准中规定但尚未实现的功能
 
-要完全实现 Proximity-1 C&S 子层，还需要补充以下内容：
+要完全实现 Proximity-1 CSS，还需要补充以下内容：
 
 #### **(1) 卷积编码 (Convolutional Code) —— 缺失**
 
@@ -308,7 +308,7 @@ $$
 - **具体要求**：
   - **发送端**：必须记录 ASM 最后一比特离开天线的时刻。
   - **接收端**：必须记录 ASM 最后一比特到达的时刻。
-- **现状**：物理层实现了测距（基于相关峰），但 C&S 子层尚未向上传递时间戳信息。
+- **现状**：物理层实现了测距（基于相关峰），但 CSS 尚未向上传递时间戳信息。
 
 #### **(4) 质量指示器 (Quality Indicator) —— 隐式实现**
 

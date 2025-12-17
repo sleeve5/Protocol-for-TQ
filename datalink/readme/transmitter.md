@@ -1,4 +1,4 @@
-这是一份关于 **Proximity-1 协议同步与编码子层（C&S Sublayer）** 数据流转的详细技术报告。
+这是一份关于 **Proximity-1 协议同步与编码子层（CSS）** 数据流转的详细技术报告。
 
 基于已经完成的代码（`scs_transmitter` + `ldpc_encoder`），数据经历了三个核心阶段的变化：**封装（Encapsulation）** $\to$ **流化（Streaming）** $\to$ **编码（Coding）**。
 
