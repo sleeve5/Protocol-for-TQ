@@ -8,7 +8,7 @@
 
 本项目基于 MATLAB 平台，设计并实现了一个高保真的 **CCSDS Proximity-1 (邻近-1)** 空间链路协议仿真系统。项目包含两个核心子系统：
 
-1. **协议栈仿真 (`datalink/`)**：聚焦于 **数据链路层 (DLL)** 和 **编码与同步子层 (C&S)**。实现了从 ARQ 自动重传、帧封装到 LDPC 信道编码的完整闭环，具备流式处理（Streaming）和状态机（FSM）接收能力。
+1. **协议栈仿真 (`datalink/`)**：聚焦于 **数据链路层 (DLL)** 和 **编码与同步子层 (CSS)**。实现了从 ARQ 自动重传、帧封装到 LDPC 信道编码的完整闭环，具备流式处理（Streaming）和状态机（FSM）接收能力。
 2. **物理层信号仿真 (`physical/`)**：基于 **LISA (Laser Interferometer Space Antenna)** 场景的光通信物理层仿真。实现了激光干涉、光电检测、PLL 锁相环以及基于 DLL (Delay Locked Loop) 的高精度测距与解调。
 
 本项目旨在验证深空通信环境下的协议鲁棒性、同步机制的稳定性以及物理层测距通信一体化的性能。
@@ -34,7 +34,7 @@
 ```mermaid
 graph TD
     User[用户载荷 Payload] -->|帧生成| DLL[数据链路层 DLL]
-    DLL -->|PLTU 封装| CS[编码与同步子层 C&S]
+    DLL -->|PLTU 封装| CS[编码与同步子层 CSS]
     CS -->|LDPC 1/2 编码| PHY_TX[发射机输出]
     PHY_TX -->|加噪信道| PHY_RX[接收机输入]
     
@@ -52,7 +52,7 @@ graph TD
 * **COP-P 通信操作过程**:
   * **FOP-P (发送端)**: 维护 $V(S)$ 状态，支持 **Go-Back-N** 自动重传策略，管理发送队列。
   * **FARM-P (接收端)**: 维护 $V(R)$ 状态，实现帧过滤、乱序检测 (Gap Detection) 和重复帧丢弃，生成 PLCW 控制字。
-* **编码与同步 (C&S)**:
+* **编码与同步 (CSS)**:
   * **LDPC 编码**: 实现 CCSDS C2 码族 (Rate 1/2, $k=1024, n=2048$)，包含矩阵生成、打孔 (Puncturing) 和伪随机化 (Randomization)。
   * **双重同步机制**: 物理层使用 **CSM (64-bit)** 进行码块同步，链路层使用 **ASM (24-bit)** 进行帧定界。
 * **流式接收机 (Streaming Receiver)**:
