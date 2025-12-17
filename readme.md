@@ -37,14 +37,14 @@ graph TD
     DLL -->|PLTU 封装| CS[编码与同步子层 CSS]
     CS -->|LDPC 1/2 编码| PHY_TX[发射机输出]
     PHY_TX -->|加噪信道| PHY_RX[接收机输入]
-    
+
     subgraph 接收端逻辑
     PHY_RX -->|CSM 搜索| FSM[流式状态机 FSM]
     FSM -->|累积与译码| LDPC_DEC[LDPC 译码器]
     LDPC_DEC -->|比特流| ASM_SEARCH[ASM 搜索]
     ASM_SEARCH -->|滑动 CRC| FRAME_EXT[变长帧提取]
     end
-    
+
     FRAME_EXT -->|FARM-P 逻辑| ARQ{ARQ 校验}
     ARQ -->|Ack/Nack| FEEDBACK[PLCW 生成]
 ```
@@ -68,8 +68,8 @@ graph TD
 graph LR
     Data[原始数据] -->|DSSS 扩频| Mod[相位调制]
     Mod -->|自由空间信道| PD[光电检测器]
-    PD -->|混频| PLL[PLL 科斯塔斯环]
-    PLL -->|相位误差| DLL[DLL 早晚门相关器]
+    PD -->|混频| PLL[PLL 锁相环]
+    PLL -->|相位误差| DLL[DLL 延迟环]
     DLL -->|延迟索引| Result[测距与误码率]
 ```
 
@@ -95,6 +95,8 @@ Protocol-for-TQ/
 │   ├── readme/                 # 技术文档 (Markdown)
 │   ├── utils/                  # 工具 (如 LDPC 矩阵生成)
 │   ├── test_main.m             # [入口] 全协议栈闭环仿真脚本
+│   ├── test_session.m          # 会话建立仿真
+│   ├── test_streaming_session.m # 流式接收会话建立仿真
 │   ├── test_unit_fsm.m         # 接收机状态机单元测试
 │   └── test_unit_farm.m        # FARM 逻辑单元测试
 ├── physical/                   # [子系统2] 物理层信号仿真
