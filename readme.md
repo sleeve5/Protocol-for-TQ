@@ -11,6 +11,14 @@
 1. **协议栈仿真 (`datalink/`)**：聚焦于 **数据链路层 (DLL)** 和 **编码与同步子层 (CSS)**。实现了从 ARQ 自动重传、帧封装到 LDPC 信道编码的完整闭环，具备流式处理（Streaming）和状态机（FSM）接收能力。
 2. **物理层信号仿真 (`physical/`)**：基于 **LISA (Laser Interferometer Space Antenna)** 场景的光通信物理层仿真。实现了激光干涉、光电检测、PLL 锁相环以及基于 DLL (Delay Locked Loop) 的高精度测距与解调。
 
+工程已经涵盖了以下所有特性：
+
+1. **物理层**：光通信 DSSS 扩频、PLL/DLL 信号处理、高精度测距。
+2. **编码层**：CCSDS C2 LDPC 编码、打孔、随机化、双重同步（CSM/ASM）。
+3. **链路层**：COP-P (ARQ) 自动重传、变长帧封装、多路复用。
+4. **控制面**：MAC 握手、定时业务、指令处理。
+5. **仿真架构**：支持流式（Streaming）处理，具备工业级软件无线电（SDR）的架构雏形。
+
 本项目旨在验证深空通信环境下的协议鲁棒性、同步机制的稳定性以及物理层测距通信一体化的性能。
 
 ---
@@ -89,22 +97,15 @@ Protocol-for-TQ/
 │   ├── archive/                # 历史测试脚本
 │   ├── data/                   # LDPC H矩阵(.mat)
 │   ├── libs/                   # 核心算法库 (FOP, FARM, LDPC, CRC, FSM)
-│   │   ├── Proximity1Receiver.m  # 流式状态机接收机
-│   │   ├── scs_transmitter.m     # 发送主控
-│   │   └── ...                   # 等...
 │   ├── readme/                 # 技术文档 (Markdown)
 │   ├── utils/                  # 工具 (如 LDPC 矩阵生成)
-│   ├── test_main.m             # [入口] 全协议栈闭环仿真脚本
-│   ├── test_session.m          # 会话建立仿真
-│   ├── test_streaming_session.m # 流式接收会话建立仿真
-│   ├── test_unit_fsm.m         # 接收机状态机单元测试
-│   └── test_unit_farm.m        # FARM 逻辑单元测试
+│   └── test_system_verification.m  # [主入口] 全系统验收测试
 ├── physical/                   # [子系统2] 物理层信号仿真
 │   ├── data/                   # 伪码数据 (.mat)
 │   ├── libs/                   # 物理层算法 (PLL, DLL, PD)
-│   ├── multi_group_test.m      # [入口] 多组数据通信测距仿真
+│   ├── multi_group_test.m      # [主入口] 多组数据通信测距仿真
 │   └── single_test.m           # 单组数据调试脚本
-├── readme.MD                   # 本文件
+├── readme.md                   # 本文件
 └── LICENSE                     # MIT License
 ```
 
@@ -140,7 +141,7 @@ generate_LDPC_matrix
 
 该仿真演示了 Alice (发送) 和 Bob (接收) 之间的通信，包含信道丢包和 ARQ 重传。
 
-1. 打开 `datalink/test_main.m`。
+1. 打开 `datalink/test_system_verification.m`。
 
 2. 运行脚本。
 

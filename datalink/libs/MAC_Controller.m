@@ -15,9 +15,9 @@ classdef MAC_Controller < handle
         Hail_Wait_Duration = 5.0; % 默认超时时间 (秒)
 
         % --- [新增] 定时业务缓冲区 ---
-        % 结构体数组: struct('SeqNo', [], 'Time', [], 'Direction', [])
-        SENT_TIME_BUFFER    
-        RECEIVE_TIME_BUFFER 
+        % 每一行存储: [Time, SeqNo, QoS]
+        SENT_TIME_BUFFER      % 记录 Egress 时间
+        RECEIVE_TIME_BUFFER   % 记录 Ingress 时间
 
     end
     
@@ -30,6 +30,8 @@ classdef MAC_Controller < handle
             obj.IO_Layer = io_layer;
             obj.FOP_Layer = fop_layer;
             obj.State = 'INACTIVE';
+            obj.SENT_TIME_BUFFER = [];
+            obj.RECEIVE_TIME_BUFFER = [];
         end
         
         % =================================================================
@@ -63,32 +65,37 @@ classdef MAC_Controller < handle
         % [新增] 定时业务接口
         % =================================================================
         
-        % 记录发射时间 (Egress Time)
-        function record_egress_time(obj, seq_no, time_val)
-            entry.SeqNo = seq_no;
+        % [标准] 5.2.1 记录 Egress Time (发送端调用)
+        % 触发时机：当 ASM 的最后一位离开物理层时
+        function capture_egress_time(obj, time_val, seq_no, qos)
+            entry = struct();
             entry.Time = time_val;
-            entry.Direction = 'Egress';
+            entry.SeqNo = seq_no;
+            entry.QoS = qos;
             
+            % 存入缓冲区
             obj.SENT_TIME_BUFFER = [obj.SENT_TIME_BUFFER; entry];
-            
-            % fprintf('[MAC Time] 记录发射时间: Seq %d @ %.6f s\n', seq_no, time_val);
         end
         
-        % 记录接收时间 (Ingress Time)
-        function record_ingress_time(obj, seq_no, time_val)
-            entry.SeqNo = seq_no;
+        % [标准] 5.2.1 记录 Ingress Time (接收端调用)
+        % 触发时机：当 ASM 的最后一位到达物理层并被识别时
+        function capture_ingress_time(obj, time_val, seq_no, qos)
+            entry = struct();
             entry.Time = time_val;
-            entry.Direction = 'Ingress';
+            entry.SeqNo = seq_no;
+            entry.QoS = qos;
             
+            % 存入缓冲区
             obj.RECEIVE_TIME_BUFFER = [obj.RECEIVE_TIME_BUFFER; entry];
-            
-            % fprintf('[MAC Time] 记录接收时间: Seq %d @ %.6f s\n', seq_no, time_val);
         end
         
-        % 获取所有记录 (用于分析)
-        function [tx_log, rx_log] = get_time_logs(obj)
-            tx_log = obj.SENT_TIME_BUFFER;
-            rx_log = obj.RECEIVE_TIME_BUFFER;
+        % [辅助] 获取用于 Time Correlation 的数据对
+        function logs = get_timing_logs(obj, direction)
+            if strcmp(direction, 'Tx')
+                logs = obj.SENT_TIME_BUFFER;
+            else
+                logs = obj.RECEIVE_TIME_BUFFER;
+            end
         end
         
         % =================================================================

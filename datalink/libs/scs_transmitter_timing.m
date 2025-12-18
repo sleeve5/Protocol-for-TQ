@@ -20,7 +20,7 @@
 % 输出参数：
 %   encoded_symbol_stream - 逻辑向量 (logical)：
 %                           经过封装、对齐和信道编码后的最终物理层符号流。
-%   time_tags             - 结构体数组，包含 .SeqNo 和 .BitIndex (相对于流开始的位索引)
+%   time_tags             - 结构体数组，包含 [.SeqNo, .BitIndex, .QoS]
 % --------------------------
 
 function [encoded_symbol_stream, time_tags] = scs_transmitter_timing(frame_queue, sim_params)
@@ -73,15 +73,17 @@ function [encoded_symbol_stream, time_tags] = scs_transmitter_timing(frame_queue
                 current_frame = [current_frame, false(1, pad_len)];
             end
 
-            % --- [新增] 解析 SeqNo 用于打标 ---
-            % 为了获取 SeqNo，我们需要简单的解析一下帧头 (前40 bits)
-            % 假设 current_frame 已经是完整的 Transfer Frame
+            % --- [新增] 关键逻辑：解析 Header 获取元数据 ---
+            % 只有拿到 SeqNo 和 QoS，才能生成标准的时间标签
             if length(current_frame) >= 40
-                % SeqNo 在 Bit 32-39
+                % 解析 SeqNo (Bit 32-39)
                 seq_bits = current_frame(33:40);
                 seq_no = bi2de(double(seq_bits), 'left-msb');
+                % 解析 QoS (Bit 2)
+                qos_bit = current_frame(3);
+                qos_val = double(qos_bit);
             else
-                seq_no = -1; % 未知或无效
+                seq_no = -1; qos_val = -1; % 无效帧
             end
 
             % 组装邻近链路传输单元 (PLTU)
@@ -92,15 +94,16 @@ function [encoded_symbol_stream, time_tags] = scs_transmitter_timing(frame_queue
             % 拼接生成 PLTU
             pltu_bits = build_PLTU(current_frame, crc_code);
             
-            % --- [新增] 计算 ASM 结束时刻 ---
+            % --- [新增] 捕捉 Egress Time (ASM 结束时刻) ---
             % PLTU 结构: ASM(24) + Frame + CRC
-            % 标准 5.2.1: "trailing edge of the last bit of the ASM"
-            % ASM 结束位置 = 当前流末尾 + 24
-            asm_end_idx = current_bit_count + 24;
+            % ASM 位于 PLTU 最前端。
+            % ASM 结束位置(绝对索引) = 当前流总长 + 24
+            asm_end_index = current_bit_count + 24;
             
             % 记录标签
             tag.SeqNo = seq_no;
-            tag.BitIndex = asm_end_idx; % 这是一个相对索引
+            tag.QoS = qos_val;
+            tag.BitIndex = asm_end_index; % 这是逻辑索引，物理层需除以符号率
             time_tags = [time_tags; tag];
 
             % 更新流

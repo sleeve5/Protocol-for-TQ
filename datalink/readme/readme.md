@@ -4,16 +4,17 @@
 
 ## 1. 系统概述 (System Overview)
 
-本项目基于 MATLAB 平台，设计并实现了一个符合 **GB/T 39353-2020**（修改采用 ISO 21459:2015 / CCSDS 211.2-B-3）标准的 Proximity-1 协议数据链路层仿真系统。
+本项目基于 MATLAB 平台，设计并实现了一个符合 **GB/T 39353-2020**（C&S 子层）及 **GB/T 39352-2020**（数据链路层）标准的 Proximity-1 协议仿真系统。
 
-系统构建了一个完整的深空通信协议栈闭环，涵盖了从**数据链路层 (Data Link Layer)** 的帧生成与 ARQ 重传，到 **编码与同步子层 (CSS)** 的信道编码，再到 **物理层 (Physical Layer)** 的调制与传输。
+系统针对 **17万公里深空通信场景**（LISA 激光链路）进行了适配，构建了从数据链路层帧生成、ARQ 重传，到信道编码、物理层调制的完整闭环。
 
-核心特性包括：
+### 核心特性
 
-1. **高增益信道编码**：实现 CCSDS C2 码族 LDPC (Rate 1/2)，在低信噪比下提供强力纠错。
-2. **双重同步机制**：物理层 CSM 同步与链路层 ASM 同步相结合，解决深空盲同步难题。
-3. **可靠传输协议**：实现了 COP-P (Communication Operations Procedure) 中的 FOP-P 和 FARM-P 状态机，支持 Go-Back-N 自动重传 (ARQ)。
-4. **流式处理架构**：接收端采用双缓冲分层状态机，能够处理碎片化、非对齐的实时比特流。
+- **高增益信道编码**：实现 **CCSDS C2 LDPC (Rate 1/2, k=1024)**，包含矩阵构造、打孔、随机化与 CSM 插入。
+- **双重同步机制**：利用 64-bit CSM 实现物理层盲同步，利用 24-bit ASM 实现链路层帧定界。
+- **可靠传输协议**：完整实现 **COP-P (Go-Back-N)** 机制，支持丢包自动检测与重传。
+- **高精度定时业务**：支持基于 ASM 物理时刻的 **Ingress/Egress 时间标签** 采集，实现单向光行时 (OWLT) 测量。
+- **流式接收架构**：接收机采用双缓冲分层状态机，支持**碎片化 (Streaming)** 和 **非对齐** 的实时数据处理。
 
 ---
 
@@ -24,19 +25,23 @@ Data-Link-Layer/
 ├── data/                       # 数据缓存目录
 │   └── CCSDS_C2_matrix.mat     # 预生成的 LDPC H 矩阵
 ├── libs/                       # 核心算法库
-│   ├── scs_transmitter.m       # [CSS] 发送主控函数 (PLTU封装 + LDPC编码)
-│   ├── receiver.m              # [CSS] 接收主控函数 (批处理模式)
-│   ├── Proximity1Receiver.m    # [CSS] 接收机类 (流式状态机模式)
-│   ├── ldpc_encoding_chain.m   # [CSS] LDPC 编码链路
+│   ├── scs_transmitter.m       # [CSS] 发送主控函数 (PLTU封装 + LDPC编码 + 时间业务)
+│   ├── receiver.m              # [CSS] 接收主控函数 (批处理模式 + 时间业务)
+│   ├── Proximity1Receiver.m    # [CSS] 接收机类 (流式状态机模式 + 时间业务)
+│   ├── ldpc_encoder.m          # [CSS] LDPC 编码链路
 │   ├── ldpc_decoder.m          # [CSS] LDPC 译码链路
 │   ├── frame_synchronizer.m    # [CSS] 通用同步器 (CSM/ASM)
 │   ├── build_PLTU.m            # [CSS] PLTU 组装
 │   ├── frame_generator.m       # [DLL] 传送帧生成器 (Header + Payload)
+│   ├── frame_multiplexer.m     # [DLL] 帧复用调度器
 │   ├── frame_parser.m          # [DLL] 传送帧解析器
 │   ├── FOP_Process.m           # [DLL] 发送端 FOP-P 状态机 (ARQ 控制)
 │   ├── FARM_Process.m          # [DLL] 接收端 FARM-P 状态机 (ARQ 控制)
 │   ├── build_PLCW.m            # [DLL] 控制字 PLCW 生成
 │   ├── parse_PLCW.m            # [DLL] 控制字 PLCW 解析
+│   ├── IO_Sublayer.m           # [DLL] I/O 子层 (队列管理/路由)
+│   ├── MAC_Controller.m        # [DLL] MAC 子层 (握手/定时存储)
+│   ├── build_SPDU.m            # [DLL] SPDU 构造工具
 │   ├── CRC32.m                 # 工具: CRC 生成
 │   ├── CRC32_check.m           # 工具: CRC 校验
 │   ├── generate_idle_sequence.m # 工具: 空闲序列
@@ -51,10 +56,10 @@ Data-Link-Layer/
 │   ├── framing.md              # 帧结构设计
 │   ├── COP_P.md                # 通信操作过程
 │   └── readme.md               # 本项目介绍
-├── test_main.m                 # [入口] 全协议栈流式闭环仿真
-├── test_unit_fsm.m             # [入口] 基于状态机的流式接收测试
-├── test_unit_farm.m            # [入口] 接收端逻辑单元测试
-└── test_session.m              # [入口] 会话建立测试脚本
+├── test_system_verification.m  # [主入口] 全系统验收测试
+├── test_phy_cs_link.m          # [单元测试] 物理/编码层链路
+├── test_dll_logic.m            # [单元测试] 数据链路层逻辑
+└── test_timing_standalone.m    # [单元测试] 定时业务精度
 ```
 
 ---
@@ -77,7 +82,7 @@ Data-Link-Layer/
 
 ## 4. 数据流与帧封装原理 (Data Flow & Encapsulation)
 
-在 CSS 子层中，数据经历了三次形态转换，形成了严格的层级封装结构。
+在 CSS 中，数据经历了三次形态转换，形成了严格的层级封装结构。
 
 ### 4.1 封装流程图解
 
@@ -171,6 +176,35 @@ $$
    - **值**：`0xFAF320`。
    - **作用**：插入在 PLTU 头部。LDPC 译码输出的是连续比特流，接收机在其中搜索 ASM 以确定数据帧的边界。
 
+### 5.4 定时业务实现 (Proximity-1 Timing Services)
+
+#### (1) 业务定义
+
+定时业务的核心是 **时间标签记录 (Time Tag Recording)**。系统在 MAC 子层维护两个关键缓冲区，用于记录传送帧通过物理层接口的精确时刻。
+
+* **参考点**：所有时间标签均对应于 **ASM (Attached Sync Marker) 最后一个比特的后沿 (Trailing Edge)**。
+* **记录内容**：三元组 `{Time, Frame_Sequence_Number, QoS_Indicator}`。
+
+#### (2) 缓冲区设计 (MAC Buffers)
+
+根据标准 Section 4.2.4，实现了以下缓冲区：
+
+1. **`SENT_TIME_BUFFER` (Egress Time)**
+   * **触发条件**：当发送端物理层发出 ASM 的最后一位时。
+   * **作用**：记录本机发出的帧的精确离去时间。
+2. **`RECEIVE_TIME_BUFFER` (Ingress Time)**
+   * **触发条件**：当接收端物理层检测到 ASM 并验证 CRC 通过后，回溯计算出的 ASM 结束时刻。
+   * **作用**：记录接收到的帧的精确到达时间。
+
+#### (3) 物理层与协议层的交互实现
+
+由于仿真环境是离散的，时间标签的计算逻辑如下：
+
+$$ T_{tag} = T_{sim\_start} + \frac{\text{Global\_Bit\_Index}_{ASM\_End}}{\text{Symbol\_Rate}} $$
+
+* **发送端 (`scs_transmitter`)**：在组装 PLTU 时，计算 ASM 结束位置在当前比特流中的索引，结合仿真时钟，调用 `MAC.capture_egress_time()`。
+* **接收端 (`Proximity1Receiver`)**：在状态机锁定 ASM 并通过 CRC 校验后，利用状态机维护的 `GlobalBitOffset` 回溯 ASM 的位置，计算到达时间，调用 `MAC.capture_ingress_time()`。
+
 ---
 
 ## 6. 工程实现说明 (Implementation)
@@ -200,45 +234,24 @@ $$
 
 ### 7.1 环境准备
 
-1. 确保 MATLAB 安装了 **Communications Toolbox**。
-2. 无需手动添加路径，所有测试脚本开头已内置自动路径配置代码 (`addpath(genpath(...))`)。
+1. MATLAB R2024b 或更高版本。
+2. 确保 MATLAB 安装了 **Communications Toolbox**。
+3. 无需手动添加路径，所有测试脚本开头已内置自动路径配置代码 (`addpath(genpath(...))`)。
 
 ### 7.2 仿真脚本说明
 
-| 脚本文件名                  | 类型               | 功能描述                                                                                                                                                           | 预期结果                                                                       |
-|:---------------------- |:---------------- |:-------------------------------------------------------------------------------------------------------------------------------------------------------------- |:-------------------------------------------------------------------------- |
-| **`test_session.m`**   | **[主入口]** 会话建立仿真 | **会话建立与握手。** 模拟 17万公里延迟下的 Hailing 过程。                                                                                                                          | 状态机从```INACTIVE```成功迁移至```DATA_SERVICES```。                                |
-| **`test_main.m`**      | **[主入口]** 全系统仿真  | **全栈 ARQ 演示。** 模拟 Alice 与 Bob 之间的双向通信。包含： <br>1. 变长帧生成与封装；<br>2. LDPC 编码与调制；<br>3. **信道突发干扰模拟 (SNR 骤降)** ；<br>4. 接收端流式解调与同步；<br>5. **ARQ 自动重传演示 (Go-Back-N)**。 | 当模拟丢包发生时，触发 **NACK** 并自动执行 **Go-Back-N** 重传，最终数据无误。                        |
-| **`test_unit_fsm.m`**  | 鲁棒性测试            | 专门测试 **`Proximity1Receiver`** 类的流式处理能力。模拟数据以极小碎片（1-256 bits）随机到达的情况。                                                                                           | 验证接收机内部状态机能否在数据碎片化的情况下正确拼接并还原数据帧。                                          |
-| **`test_unit_farm.m`** | 逻辑验证             | 专门测试数据链路层的 **FARM-P (接收控制)** 逻辑。不涉及物理层，直接输入帧头信息。                                                                                                               | 验证接收端能否正确识别：<br>- 正常帧 (Accept)<br>- 乱序帧 (Reject + Retx)<br>- 重复帧 (Discard) |
-
-### 7.3 运行步骤示例
-
-**运行全链路闭环仿真：**
-
-1. 在 MATLAB 中打开 `test_main.m`。
-2. 点击 **Run**。
-3. 观察 Command Window 输出的日志，重点关注 `[Simulation Step 2]` (模拟丢包) 和 `[Simulation Step 4]` (自动重传) 的过程。
-
-**输出日志示例：**
-
-```text
-...
-[Channel] 💥 突发强干扰! SNR 降至 0.5 dB
-[Bob DLL] ❌ 未收到有效帧 (物理层丢包)
-...
-[FARM] 检测到丢帧! 期望 1, 收到 2. 请求重传.
-[Feedback] Bob 发送 NACK: Expecting V(R)=1
-[Alice] 状态: 重传模式.
-...
-✅ 测试结论: SUCCESS - 所有数据帧均完美恢复！
-```
+| 脚本文件名                            | 功能描述                                              | 预期结果                                        |
+|:-------------------------------- |:------------------------------------------------- |:------------------------------------------- |
+| **`test_system_verification.m`** | **全系统验收测试**。<br>包含：MAC握手、定时业务、ARQ重传(模拟信道中断)、流式接收。 | **ALL PASS**。<br>定时业务误差 < 1ms。<br>最终数据完整交付。 |
+| **`test_phy_cs_link.m`**         | **物理/编码层测试**。<br>验证接收机在长延迟噪声填充下的同步锁定能力。           | **SUCCESS**。<br>接收机成功提取数据。                  |
+| **`test_dll_logic.m`**           | **数据链路逻辑测试**。<br>剥离物理层，验证 FOP/FARM 状态机对丢包、乱序的处理。  | **SUCCESS**。<br>所有 Seq 按序确认。                |
+| **`test_timing_standalone.m`**   | **定时精度测试**。<br>验证流式接收模式下的 OWLT 计算精度。              | **SUCCESS**。<br>误差接近 0。                     |
 
 ---
 
 ## 8. 仿真结论 (Simulation Conclusions)
 
-通过运行全协议栈闭环测试脚本 (`test_main.m`)，本系统在模拟的深空通信信道环境下进行了全面验证。仿真结果表明系统达到了以下关键技术指标：
+通过运行全协议栈闭环测试脚本 (`test_system_verification.m`)，本系统在模拟的深空通信信道环境下进行了全面验证。仿真结果表明系统达到了以下关键技术指标：
 
 ### 8.1 物理层抗噪性能 (PHY Robustness)
 
@@ -257,6 +270,7 @@ $$
 
 * **流式处理能力**：接收机成功处理了 **碎片化 (Fragmented)** 的输入数据流（模拟硬件 FIFO 行为），证明了“双缓冲分层状态机”架构在处理跨块传输和变长帧时的正确性。
 * **自适应解帧**：**滑动 CRC 校验** 算法在未知帧长的情况下，实现了 100% 准确的变长帧提取，且有效过滤了 Payload 中伪造的 ASM 头部干扰。
+* **定时业务**：实现了精确的物理层时间打标，仿真测距误差收敛至系统采样精度极限。
 
 **结论**：本项目成功构建了一个符合 CCSDS 标准、具备工业级流式处理能力且具有自我修复功能的深空通信协议栈原型。
 
@@ -277,6 +291,7 @@ $$
 - ✅ **LDPC 编码 (Rate 1/2)**：基于 CCSDS 131.0 C2 标准的矩阵构造、打孔、随机化、CSM 插入。
 - ✅ **接收同步**：基于数据辅助的物理层捕获、CSM 帧同步。
 - ✅ **自适应接收**：基于 ASM 搜索 + 滑动 CRC 校验的变长帧提取。
+- ✅ **定时业务**：实现了基于 MAC 缓冲区的 **Ingress/Egress Time Tagging**。
 - ❓ **接口适配**：与物理层（调制/解调/光电/PLL）的软信息交互接口。
 
 ### 9.2 标准中规定但尚未实现的功能
@@ -301,16 +316,7 @@ $$
   - Rate 7/8 使用的是 32位 CSM (`1ACFFC1D`)，而不是 64位。
 - **现状**：目前仅实现了 Rate 1/2 ($M=512$)。
 
-#### **(3) 定时服务 (Timing Services) —— 缺失**
-
-- **标准依据**：GB/T 39353 第 10.5.6 节 (Send Side) & 11.3.6.8 节 (Receive Side)。
-- **描述**：Proximity-1 协议的一个核心功能是**时间标签 (Time Tagging)**，用于测量距离和时钟校准。
-- **具体要求**：
-  - **发送端**：必须记录 ASM 最后一比特离开天线的时刻。
-  - **接收端**：必须记录 ASM 最后一比特到达的时刻。
-- **现状**：物理层实现了测距（基于相关峰），但 CSS 尚未向上传递时间戳信息。
-
-#### **(4) 质量指示器 (Quality Indicator) —— 隐式实现**
+#### **(3) 质量指示器 (Quality Indicator) —— 隐式实现**
 
 - **标准依据**：Annex B (Service)。
 - **描述**：接收端在向上传递帧时，应附带一个标志位：`Good` 或 `Bad`。

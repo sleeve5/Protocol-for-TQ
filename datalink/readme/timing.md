@@ -1,6 +1,6 @@
 # Proximity-1 定时业务说明 (Timing Services)
 
-**对应文件**：`test_timing_service.m`, `MAC_Controller.m`
+**对应文件**：`test_timing_service.m`, `MAC_Controller.m`, `scs_transmitter_timing.m`, `receiver_timing.m`, `Proximity1Receiver_timing.m`
 
 ## 1. 概述
 
