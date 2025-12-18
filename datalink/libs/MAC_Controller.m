@@ -13,6 +13,12 @@ classdef MAC_Controller < handle
         % 会话参数
         Current_Remote_SCID 
         Hail_Wait_Duration = 5.0; % 默认超时时间 (秒)
+
+        % --- [新增] 定时业务缓冲区 ---
+        % 结构体数组: struct('SeqNo', [], 'Time', [], 'Direction', [])
+        SENT_TIME_BUFFER    
+        RECEIVE_TIME_BUFFER 
+
     end
     
     methods
@@ -51,6 +57,38 @@ classdef MAC_Controller < handle
             
             % 3. 发送 (通过 IO 层)
             obj.IO_Layer.send_directive(spdu_bits, remote_scid);
+        end
+
+        % =================================================================
+        % [新增] 定时业务接口
+        % =================================================================
+        
+        % 记录发射时间 (Egress Time)
+        function record_egress_time(obj, seq_no, time_val)
+            entry.SeqNo = seq_no;
+            entry.Time = time_val;
+            entry.Direction = 'Egress';
+            
+            obj.SENT_TIME_BUFFER = [obj.SENT_TIME_BUFFER; entry];
+            
+            % fprintf('[MAC Time] 记录发射时间: Seq %d @ %.6f s\n', seq_no, time_val);
+        end
+        
+        % 记录接收时间 (Ingress Time)
+        function record_ingress_time(obj, seq_no, time_val)
+            entry.SeqNo = seq_no;
+            entry.Time = time_val;
+            entry.Direction = 'Ingress';
+            
+            obj.RECEIVE_TIME_BUFFER = [obj.RECEIVE_TIME_BUFFER; entry];
+            
+            % fprintf('[MAC Time] 记录接收时间: Seq %d @ %.6f s\n', seq_no, time_val);
+        end
+        
+        % 获取所有记录 (用于分析)
+        function [tx_log, rx_log] = get_time_logs(obj)
+            tx_log = obj.SENT_TIME_BUFFER;
+            rx_log = obj.RECEIVE_TIME_BUFFER;
         end
         
         % =================================================================
