@@ -40,6 +40,7 @@ total_data_bits = 6400;  % 总通信数据长度（比特）
 remote_data = randi([0, 1], 1, total_data_bits);  % 随机生成二进制通信数据
 real_distance = randi([50000, 100000]);  % 随机生成真实距离(50-100km)
 total_groups = ceil(total_data_bits / params.data_length);  % 计算数据分组总数
+params.real_distance = real_distance;
 
 
 %% 4. 运行通信测距仿真
