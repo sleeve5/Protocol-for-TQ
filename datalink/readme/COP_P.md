@@ -24,6 +24,10 @@
 2. **处理 ACK**：接收 PLCW，根据 `Report Value` 清除队列中已确认的帧。
 3. **处理 NACK (重传)**：若 PLCW 中 `Retransmit Flag = 1`，则暂停新数据发送，将指针回退到最早未确认的帧，启动 **Go-Back-N** 重传。
 
+关于 **SYNCH_TIMER** 的实现：
+为了解决反向链路丢包导致的死锁问题，FOP-P 维护了一个递减计数器。当发送队列非空且长时间未收到 ACK 时，计时器归零触发 TimeOut 事件，强制 FOP-P 进入重传模式。该机制保证了协议在双向信道均不稳定的情况下仍具有自愈能力。
+
+
 ## 3. 接收端控制：FARM-P (Frame Acceptance and Reporting Mechanism)
 
 `FARM_Process.m` 类负责接收端的帧过滤、排序和反馈生成。
