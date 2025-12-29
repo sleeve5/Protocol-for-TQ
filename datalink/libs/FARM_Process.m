@@ -50,14 +50,17 @@ classdef FARM_Process < handle
                 % --- Sequence Controlled Service (序列控制帧) ---
                 N_S = frame_header.SeqNo; % 发送来的序号
                 
-                if N_S == obj.V_R
+                % 计算差值 (Modulo 256)
+                diff = mod(N_S - obj.V_R, 256);
+                
+                if diff == 0
                     % [情况 A]: 序号匹配 (In-Sequence)
                     % 接收成功，窗口滑动
                     accept = true;
                     obj.V_R = mod(obj.V_R + 1, 256);
                     obj.Retransmit_Flag = false; % 清除重传标志
                     
-                elseif N_S > obj.V_R 
+                elseif diff < 128
                     % [情况 B]: 序号跳变 (Gap Detected / 丢帧)
                     % 比如期望 5，来了 7。说明 5,6 丢了。
                     % 拒绝接收 7，并要求重传
@@ -65,7 +68,7 @@ classdef FARM_Process < handle
                     obj.Retransmit_Flag = true;
                     fprintf('[FARM] 检测到丢帧! 期望 %d, 收到 %d. 请求重传.\n', obj.V_R, N_S);
                     
-                elseif N_S < obj.V_R
+                else
                     % [情况 C]: 序号重复 (Duplicate / 迟到)
                     % 比如期望 5，来了 3。说明 ACK 丢了，发送端重发了旧数据。
                     % 拒绝接收（去重），但回送 ACK 告诉它"我已经到5了"
