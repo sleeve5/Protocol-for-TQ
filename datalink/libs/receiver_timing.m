@@ -37,7 +37,7 @@ function [recovered_frames, rx_time_tags] = receiver_timing(rx_soft_bits, sim_pa
     switch sim_params.CodingType
         case 2 % LDPC
             % A. 物理层同步
-            csm_indices = frame_synchronizer(rx_soft_bits, csm_bits, 20);
+            csm_indices = frame_synchronizer(rx_soft_bits, csm_bits, 4);
             if isempty(csm_indices), return; end
             
             lock_pos = csm_indices(1);

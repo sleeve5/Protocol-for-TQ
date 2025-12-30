@@ -120,7 +120,7 @@ classdef Proximity1Receiver_timing < handle
                 if length(obj.LinkBuffer) < 56, break; end
                 
                 % ASM 搜索 (硬判决，容错0)
-                asm_idx = frame_synchronizer(double(obj.LinkBuffer), obj.Pat_ASM, 0);
+                asm_idx = frame_synchronizer(double(obj.LinkBuffer), obj.Pat_ASM, 2);
                 
                 if isempty(asm_idx)
                     keep = 23;

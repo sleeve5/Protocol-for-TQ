@@ -59,7 +59,7 @@ fprintf('\n[2] 信道: BPSK 调制与 AWGN 噪声...\n');
 % --- A. 设置信噪比 (Eb/N0) ---
 % Proximity-1 LDPC (Rate 1/2) 理论门限极低。
 % 设置 4.0 dB 以确保无误码；若设置 1.5 dB 可能会看到丢帧。
-EbN0_dB = 4.0; 
+EbN0_dB = 1.5; 
 code_rate = 1/2; 
 
 % --- B. 计算噪声参数 ---

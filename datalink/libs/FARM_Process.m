@@ -1,15 +1,15 @@
 classdef FARM_Process < handle
-    % FARM_Process 接收端帧接收与报告机制 (FARM-P)
-    % 对应标准: CCSDS 211.0-B-6 Section 7.3
+    % FARM_Process 接收端帧接收与报告机制 (Strict Standard Version)
+    % 严格遵循: CCSDS 211.0-B-6 Section 7.3.1 (FARM-P State Table)
     
     properties
-        % 状态变量 (Section 7.3.2)
-        V_R         % Receiver Frame Sequence Number (期望的下一个序号)
-        Exp_Counter % Expedited Frame Counter
-        Retransmit_Flag % R(S) 是否需要重传
+        % --- 内部变量 (7.3.2) ---
+        V_R             % 期望的下一个序列号 (0-255)
+        Exp_Counter     % 加速帧计数器 (0-7)
+        Retransmit_Flag % R(S): 是否请求重传
         
-        % 配置
-        PCID        % 绑定的物理信道
+        % --- 配置 ---
+        PCID            % 绑定的物理信道
     end
     
     methods
@@ -18,74 +18,112 @@ classdef FARM_Process < handle
             obj.reset();
         end
         
+        % 对应事件 RE0: Initialization
         function reset(obj)
             obj.V_R = 0;
             obj.Exp_Counter = 0;
-            obj.Retransmit_Flag = false;
+            obj.Retransmit_Flag = false; % R(S) = false
         end
         
-        % 核心处理函数：输入解析后的帧头，输出处理结果
+        % =================================================================
+        % 核心处理函数: process_frame
+        % 输入: frame_header (结构体)
+        % 输出: 
+        %   accept:   是否将数据上交给 I/O 子层
+        %   plcw_req: 是否置位 NEED_PLCW (触发发送 ACK)
+        % =================================================================
         function [accept, plcw_req] = process_frame(obj, frame_header)
-            % accept: 是否接收该帧数据
-            % plcw_req: 是否需要立即发送 PLCW (通常都需要)
             
             accept = false;
-            plcw_req = true; % 收到 Sequence Controlled 帧通常触发 PLCW
+            plcw_req = false; % 默认不触发，除非标准明确要求
             
-            % 1. 检查 PCID 是否匹配
+            % 0. 校验 PCID (隐式条件)
             if frame_header.PCID ~= obj.PCID
-                % 不是发给我的，忽略
-                return; 
+                return; % 忽略非本信道帧
             end
             
-            % 2. 区分 QoS 类型
+            % --- 特殊处理: SET V(R) 指令 (Event RE2) ---
+            % 这一步通常需要在外部解析 P-Frame 后调用 obj.force_set_vr(val)
+            % 但如果 P-Frame 传进来，我们需要在这里识别
+            if frame_header.PDU_Type == 1
+                % P-Frame 包含指令。
+                % 注意：标准规定 P-Frame 也是通过 Expedited 服务传输的
+                % 具体的指令解析应在 MAC 层或 Directive Decoder 完成
+                % 这里我们仅处理作为 "Valid Expedited Frame" (Event RE3) 的部分
+            end
+
+            % =============================================================
+            % 1. 加速服务 (Expedited Service) -> Event RE3
+            % =============================================================
             if frame_header.QoS == 1 
-                % --- Expedited Service (加速帧) ---
-                % 不检查序列号，直接接收
-                obj.Exp_Counter = mod(obj.Exp_Counter + 1, 8);
+                % 动作: Accept, Increment EXP Counter
                 accept = true;
-                % 加速帧不强制改变 ARQ 状态，但可能触发 PLCW 更新计数
+                obj.Exp_Counter = mod(obj.Exp_Counter + 1, 8);
                 
+                % 标准 RE3 中并未要求 设置 NEED_PLCW = true
+                plcw_req = false; 
+                
+            % =============================================================
+            % 2. 序列控制服务 (Sequence Controlled Service)
+            % =============================================================
             else 
-                % --- Sequence Controlled Service (序列控制帧) ---
-                N_S = frame_header.SeqNo; % 发送来的序号
-                
-                % 计算差值 (Modulo 256)
+                N_S = frame_header.SeqNo;
                 diff = mod(N_S - obj.V_R, 256);
                 
                 if diff == 0
-                    % [情况 A]: 序号匹配 (In-Sequence)
-                    % 接收成功，窗口滑动
+                    % --- Event RE4: Sequence Frame 'in-sequence' ---
+                    % 条件: N(S) == V(R)
+                    % 动作: Accept, R(S)=false, Inc V(R), NEED_PLCW=true
                     accept = true;
+                    obj.Retransmit_Flag = false;
                     obj.V_R = mod(obj.V_R + 1, 256);
-                    obj.Retransmit_Flag = false; % 清除重传标志
+                    plcw_req = true; % 必须发送 ACK
                     
                 elseif diff < 128
-                    % [情况 B]: 序号跳变 (Gap Detected / 丢帧)
-                    % 比如期望 5，来了 7。说明 5,6 丢了。
-                    % 拒绝接收 7，并要求重传
+                    % --- Event RE5: Sequence Frame 'gap detected' ---
+                    % 条件: N(S) > V(R) (在窗口内)
+                    % 动作: Discard, R(S)=true, NEED_PLCW=true
                     accept = false;
                     obj.Retransmit_Flag = true;
-                    fprintf('[FARM] 检测到丢帧! 期望 %d, 收到 %d. 请求重传.\n', obj.V_R, N_S);
+                    plcw_req = true; % 必须发送 NACK
+                    
+                    fprintf('[FARM Strict] 丢包: 期望 %d, 收到 %d. 触发重传请求.\n', obj.V_R, N_S);
                     
                 else
-                    % [情况 C]: 序号重复 (Duplicate / 迟到)
-                    % 比如期望 5，来了 3。说明 ACK 丢了，发送端重发了旧数据。
-                    % 拒绝接收（去重），但回送 ACK 告诉它"我已经到5了"
+                    % --- Event RE6: Sequence Frame 'already received' ---
+                    % 条件: N(S) < V(R) (即重复帧)
+                    % 动作: Discard
+                    % [注意] 标准在此处没有要求 NEED_PLCW = true！
+                    % 意味着接收机保持沉默，等待发送方超时查询或下一帧到来
                     accept = false;
-                    % Retransmit_Flag 保持不变或置否? 标准 RE6: 丢弃帧，不改变 R(S)
-                    fprintf('[FARM] 检测到重复帧 %d. 丢弃.\n', N_S);
+                    plcw_req = false; % 严格遵循标准: 不立即回 ACK
+                    
+                    fprintf('[FARM Strict] 重复帧: %d. 丢弃 (保持沉默).\n', N_S);
                 end
             end
         end
         
-        % 获取当前的 PLCW 比特
+        % =================================================================
+        % [新增] Event RE2: Valid 'SET V(R)' directive arrives
+        % 该函数应由 MAC 层解析指令后调用
+        % =================================================================
+        function execute_set_vr(obj, new_vr_value)
+            % 动作: R(S)=false, Set V(R), NEED_PLCW=true
+            obj.Retransmit_Flag = false;
+            obj.V_R = new_vr_value;
+            
+            % 这里虽然函数不能直接返回 plcw_req，但应当通知 MAC 层
+            fprintf('[FARM Strict] 执行 SET V(R) -> %d. 状态重置.\n', new_vr_value);
+        end
+        
+        % =================================================================
+        % 辅助: 获取 PLCW 数据
+        % =================================================================
         function bits = get_PLCW(obj)
             state.V_R = obj.V_R;
             state.Exp_Counter = obj.Exp_Counter;
             state.PCID = obj.PCID;
             state.Retransmit = obj.Retransmit_Flag;
-            
             bits = build_PLCW(state);
         end
     end
