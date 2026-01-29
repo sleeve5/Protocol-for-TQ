@@ -32,7 +32,7 @@ K_INFO = 1024;
 CODE_RATE = 1/2;
 min_errors = 500;    % 最少收集错误帧数 (保证FER准确性)
 min_blocks = 5000;    % 最少仿真块数
-max_blocks = 100000;  % 最大仿真块数
+max_blocks = 50000;  % 最大仿真块数
 
 % 结果容器
 res_snr      = zeros(size(EbN0_range));
@@ -185,8 +185,8 @@ hold on; grid on;
 [sorted_post, idx_post] = sort(res_ber_post);
 sorted_fer_post = res_fer(idx_post);
 
-p2 = plot(sorted_post * 100, sorted_fer_post * 100, 'b-o', ...
-    'LineWidth', 1.5, 'DisplayName', 'LDPC 编码');
+% p2 = plot(sorted_post * 100, sorted_fer_post * 100, 'b-o', ...
+%     'LineWidth', 1.5, 'DisplayName', 'LDPC 编码');
 
 % 装饰
 xlabel('误码率(%)'); 

@@ -106,14 +106,14 @@ classdef IO_Sublayer < handle
             else
                 % U-Frame -> 投递到指定端口
                 port = header.PortID;
-                fprintf('[IO Rx] 收到来自 Sat-%d 的数据 (Port %d, Len %d)\n', ...
+                fprintf('[IO Rx] 收到来自 SC-%d 的数据 (Port %d, Len %d)\n', ...
                     src_scid, port, length(payload));
             end
         end
         
         function notify_mac_layer(obj, src_scid, payload)
             % 实际工程中这里会触发 Event
-            fprintf('[IO Rx] 收到来自 Sat-%d 的 MAC 指令，转交解析...\n', src_scid);
+            fprintf('[IO Rx] 收到来自 SC-%d 的 MAC 指令，转交解析...\n', src_scid);
         end
     end
 end

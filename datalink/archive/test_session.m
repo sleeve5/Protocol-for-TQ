@@ -134,7 +134,7 @@ fprintf('\n--- [Step 5] Alice 接收应答 ---\n');
 alice_rx_frames = receiver(rx_resp_llr, sim_params, []);
 if ~isempty(alice_rx_frames)
     [h_alice, p_alice] = frame_parser(alice_rx_frames{1});
-    fprintf('[Alice Rx] 收到来自 Sat-%d 的帧。\n', h_alice.SCID);
+    fprintf('[Alice Rx] 收到来自 SC-%d 的帧。\n', h_alice.SCID);
     
     % Alice MAC 确认连接
     if strcmp(mac_alice.State, 'HAILING')

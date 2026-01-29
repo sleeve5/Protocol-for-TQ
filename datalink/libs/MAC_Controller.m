@@ -46,7 +46,7 @@ classdef MAC_Controller < handle
             obj.Current_Remote_SCID = remote_scid;
             obj.State = 'HAILING';
             
-            fprintf('[MAC] 进入 HAILING 状态，正在呼叫 Sat-%d...\n', remote_scid);
+            fprintf('[MAC] 进入 HAILING 状态，正在呼叫 SC-%d...\n', remote_scid);
             
             % 1. 构造指令 (SET TRANSMITTER/RECEIVER PARAMETERS)
             % 这里调用辅助函数生成指令比特
@@ -108,7 +108,7 @@ classdef MAC_Controller < handle
                 case 'INACTIVE'
                     % 如果是 Responder，收到数据意味着 Caller 在呼叫
                     if ~obj.IsCaller
-                        fprintf('[MAC] 收到来自 Sat-%d 的连接请求。\n', src_scid);
+                        fprintf('[MAC] 收到来自 SC-%d 的连接请求。\n', src_scid);
                         fprintf('[MAC] 状态迁移: INACTIVE -> DATA_SERVICES\n');
                         obj.State = 'DATA_SERVICES';
                         obj.Current_Remote_SCID = src_scid;
@@ -119,7 +119,7 @@ classdef MAC_Controller < handle
                 case 'HAILING'
                     % 如果是 Caller，收到数据意味着 Responder 应答了
                     if obj.IsCaller && src_scid == obj.Current_Remote_SCID
-                        fprintf('[MAC] 收到 Sat-%d 的 Hailing 应答。\n', src_scid);
+                        fprintf('[MAC] 收到 SC-%d 的 Hailing 应答。\n', src_scid);
                         fprintf('[MAC] 状态迁移: HAILING -> DATA_SERVICES\n');
                         obj.State = 'DATA_SERVICES';
                     end
