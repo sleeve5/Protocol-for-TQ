@@ -123,11 +123,11 @@ function corrected_delay = DLL(sampled_prn, phase_error, params)
         shift_offset = track_idx + (coarse_delay - 0.5) * prn_sample_mult - 1;
         % 伪码循环移位（处理边界情况）
         if shift_offset >= 1
-            shift_samples = shift_offset * (fs / prn_rate) / prn_sample_mult;
+            shift_samples = round(shift_offset * (fs / prn_rate) / prn_sample_mult);
             shifted_prn = [pn_ad(prn_total_samples - shift_samples + 1 : prn_total_samples), ...
                            pn_ad(1 : prn_total_samples - shift_samples)];
         else
-            shift_samples = shift_offset * (fs / prn_rate) / prn_sample_mult;
+            shift_samples = round(shift_offset * (fs / prn_rate) / prn_sample_mult);
             shifted_prn = [pn_ad(prn_total_samples - shift_samples + 1 - prn_total_samples : prn_total_samples), ...
                            pn_ad(1 : prn_total_samples - shift_samples - prn_total_samples)];
         end

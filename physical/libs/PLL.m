@@ -15,7 +15,7 @@
 %   pll_output    - 锁相环输出信号（与输入信号相位同步的正弦信号）
 % --------------------------
 
-function [phase_error, pll_output] = PLL(ref_signal, carrier_freq, params)
+function [phase_error, dpll_output] = PLL(ref_signal, carrier_freq, params)
     
     % 1. 参数初始化与校验
     % 设置默认参数
@@ -102,7 +102,7 @@ function [phase_error, pll_output] = PLL(ref_signal, carrier_freq, params)
     % title('PLL信号功率谱对比', 'FontSize', 11);
 
     % 6. 输出结果赋值
-    pll_output = sin(2 * pi * nco_phase);  % 最终锁相输出信号
+    dpll_output = sin(2 * pi * nco_phase);  % 最终锁相输出信号
 
 end
     

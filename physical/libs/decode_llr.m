@@ -94,6 +94,8 @@ function [decode_result] = decode_llr(phase_error, sampled_prn_remote, remote_da
             decode_result.received_data(bit_idx) = 1;
         end
     end
+
+    decode_result.received_data = double(~decode_result.received_data);
     
     % 4. 误码率（BER）计算 (基于硬判决结果)
     % 远端数据 remote_data 在传输前已编码（0/1），需转换为硬判决形式 (0/1)

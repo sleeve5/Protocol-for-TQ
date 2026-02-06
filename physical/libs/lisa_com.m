@@ -50,7 +50,7 @@ function [result, save_data] = lisa_com(remote_data, real_distance, params)
 
     % 预计算常量参数
     % 存储循环中保持不变的计算结果，减少重复运算
-    repeat_times = 32;  % 复合码重复传输次数
+    repeat_times = params.repeat_times;  % 复合码重复传输次数
     [result.total_groups, group_data] = split_data(remote_data, params.data_length);
     data_groups = result.total_groups;  % 总数据组数
     
@@ -125,7 +125,7 @@ function [result, save_data] = lisa_com(remote_data, real_distance, params)
         % 信号处理与结果计算
         % 执行光电探测、锁相环、解码等操作，计算测距结果
         carrier_freq = params.remote_laser_freq - params.local_laser_freq;  % 载波频率差
-        [phase_error, ~] = PLL(PD(local_signal, remote_signal, params), carrier_freq, params);  % 相位提取
+        [phase_error, ~] = PLL(PD(remote_signal, local_signal, params), carrier_freq, params);  % 相位提取
         
         % 计算校正后的延迟索引
         corrected_delay_idx = DLL(sampled_prn1, phase_error, params) - DLL(sampled_prn2, phase_error, params);
