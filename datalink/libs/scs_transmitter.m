@@ -100,53 +100,34 @@ function encoded_symbol_stream = scs_transmitter(frame_queue, sim_params)
     
     % 5. 数据流合并与对齐 (Streaming & Alignment)
     raw_bit_stream = [stream_buffer{1:buffer_idx-1}];
-
-    % LDPC编码块长度对齐，输入长度必须固定为 1024 的倍数
-    if sim_params.CodingType == 2 % LDPC 编码模式
-        BLOCK_SIZE_K = 1024;
-        current_len = length(raw_bit_stream);
-        remainder = mod(current_len, BLOCK_SIZE_K);
-        
-        if remainder ~= 0
-            padding_len = BLOCK_SIZE_K - remainder;
-            fprintf('[Tx] 3.1 [LDPC对齐] 数据流非整块(%d)，追加 %d bits 填充数据。\n', current_len, padding_len);
-            
-            % 生成填充序列并追加
-            padding_seq = generate_idle_sequence(padding_len);
-            raw_bit_stream = [raw_bit_stream, padding_seq];
-        end
-    end
-
-    % 6. 信道编码
-    fprintf('[Tx] 4. 进入信道编码层 (Type: %d)...\n', sim_params.CodingType);
-    encoded_symbol_stream = channel_encoder_dispatcher(raw_bit_stream, sim_params);
     
-    fprintf('[Tx] --- 发送处理完成. 总符号数: %d ---\n', length(encoded_symbol_stream));
-end
-
-% --------------------------
-% 信道编码调度函数 (Internal Helper)
-% 功能：根据配置参数分发数据流到具体的信道编码器实现。
-% 输入参数：
-%   in_stream - 待编码的比特流 (logical)
-%   params    - 包含 .CodingType 的配置结构体
-% 输出参数：
-%   out_stream - 编码后的符号流 (logical)
-% --------------------------
-
-function out_stream = channel_encoder_dispatcher(in_stream, params)
-    switch params.CodingType
-        case 0 % 无编码
-            out_stream = in_stream;
+    switch sim_params.CodingType
+        case 0 % Uncoded
+            encoded_symbol_stream = raw_bit_stream;
             
-        case 1 % 卷积编码
-            % out_stream = convolutional_encode(in_stream); % 待实现
-            out_stream = in_stream; 
+        case 1 % Convolutional Code
+            % 直接调用卷积编码器 (流式，无需 Padding)
+            encoded_symbol_stream = convolutional_encoder(raw_bit_stream);
             
-        case 2 % LDPC 编码
-            out_stream = ldpc_encoder(in_stream);
+        case 2 % LDPC Code
+            % 执行 LDPC 对齐 (Padding)
+            BLOCK_SIZE_K = 1024;
+            current_len = length(raw_bit_stream);
+            remainder = mod(current_len, BLOCK_SIZE_K);
+        
+            if remainder ~= 0
+                padding_len = BLOCK_SIZE_K - remainder;
+                fprintf('[Tx] 3.1 [LDPC对齐] 数据流非整块(%d)，追加 %d bits 填充数据。\n', current_len, padding_len);
+                padding_seq = generate_idle_sequence(padding_len);
+                raw_bit_stream = [raw_bit_stream, padding_seq];
+            end
+            
+            % 调用 LDPC 编码器
+            encoded_symbol_stream = ldpc_encoder(raw_bit_stream);
             
         otherwise
-            error('未知的编码类型: %d', params.CodingType);
+            error('SCS: Unknown CodingType %d', sim_params.CodingType);
     end
+    
+    fprintf('[Tx] --- 发送处理完成. 总符号数: %d ---\n', length(encoded_symbol_stream));
 end
